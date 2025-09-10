@@ -13,10 +13,14 @@
         </testsuite>
     </testsuites>
 
-    <coverage>
+    <coverage includeUncoveredFiles="true" processUncoveredFiles="true">
         <include>
             <directory suffix=".php">./src</directory>
         </include>
+        <exclude>
+            <directory suffix=".php">./src/Storage</directory>
+            <directory suffix=".php">./src/Exceptions</directory>
+        </exclude>
     </coverage>
 
     <php>
@@ -24,5 +28,10 @@
         <env name="PROMETHEUS_ENABLED" value="true"/>
         <env name="PROMETHEUS_STORAGE_DRIVER" value="memory"/>
         <ini name="error_reporting" value="E_ALL &amp; ~E_DEPRECATED"/>
+        <ini name="memory_limit" value="512M"/>
     </php>
+
+    <logging>
+        <junit outputFile="build/logs/junit.xml"/>
+    </logging>
 </phpunit>
