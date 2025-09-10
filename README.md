@@ -4,7 +4,7 @@
 [![Total Downloads](https://img.shields.io/packagist/dt/iamfarhad/laravel-prometheus.svg?style=flat-square)](https://packagist.org/packages/iamfarhad/laravel-prometheus)
 [![PHP Version](https://img.shields.io/packagist/php-v/iamfarhad/laravel-prometheus.svg?style=flat-square)](https://packagist.org/packages/iamfarhad/laravel-prometheus)
 [![Laravel Version](https://img.shields.io/badge/laravel-10%2C%2011%2C%2012-red.svg?style=flat-square)](https://laravel.com)
-[![GitHub Tests](https://img.shields.io/github/actions/workflow/status/iamfarhad/laravel-prometheus/ci.yml?branch=main&label=tests&style=flat-square)](https://github.com/iamfarhad/laravel-prometheus/actions)
+[![GitHub Tests](https://img.shields.io/github/actions/workflow/status/iamfarhad/laravel-prometheus/ci.yml?branch=1.x&label=tests&style=flat-square)](https://github.com/iamfarhad/laravel-prometheus/actions)
 
 **Enterprise-grade Prometheus metrics exporter for Laravel applications with comprehensive monitoring capabilities and industry-standard SLO tracking.**
 
