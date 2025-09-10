@@ -28,11 +28,16 @@ updates:
           - "laravel/pint"
           - "mockery/*"
           - "orchestra/*"
+        update-types:
+          - "minor"
+          - "patch"
       security-updates:
         patterns:
           - "*"
         update-types:
-          - "security"
+          - "major"
+          - "minor"
+          - "patch"
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
