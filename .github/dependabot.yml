@@ -1,0 +1,56 @@
+version: 2
+updates:
+  # Enable version updates for Composer
+  - package-ecosystem: "composer"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "iamfarhad"
+    assignees:
+      - "iamfarhad"
+    commit-message:
+      prefix: "⬆️"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automated"
+    # Group development dependencies
+    groups:
+      dev-dependencies:
+        patterns:
+          - "phpunit/*"
+          - "phpstan/*"
+          - "laravel/pint"
+          - "mockery/*"
+          - "orchestra/*"
+      security-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "security"
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "iamfarhad"
+    assignees:
+      - "iamfarhad"
+    commit-message:
+      prefix: "⬆️"
+      include: "scope"
+    labels:
+      - "github-actions"
+      - "dependencies"
+      - "automated"

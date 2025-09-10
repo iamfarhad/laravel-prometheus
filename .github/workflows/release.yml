@@ -1,0 +1,302 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.2.3)'
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+  attestations: write
+  id-token: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Check if this is a prerelease
+          if [[ "$VERSION" =~ (alpha|beta|rc|dev) ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "Releasing version: $VERSION"
+          echo "Is prerelease: $(echo $VERSION | grep -E '(alpha|beta|rc|dev)' && echo 'true' || echo 'false')"
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[0-9]+)?)?$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Expected format: vX.Y.Z or vX.Y.Z-suffix"
+            exit 1
+          fi
+          echo "✅ Version format is valid: $VERSION"
+
+      - name: Check if tag exists
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "❌ Tag $VERSION already exists"
+            exit 1
+          fi
+          echo "✅ Tag $VERSION does not exist yet"
+
+  tests:
+    name: Run Tests
+    uses: ./.github/workflows/ci.yml
+    needs: validate
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+  build:
+    name: Build Release Assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [validate, tests]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@c541c155eee45413f5b09a52248675b1a2575231 # v2.31.1
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies (production)
+        run: composer install --prefer-dist --no-progress --no-interaction --optimize-autoloader --no-dev
+
+      - name: Create release archive
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          ARCHIVE_NAME="laravel-prometheus-${VERSION}.zip"
+          
+          # Create a clean copy for distribution
+          mkdir -p build/release
+          rsync -av --exclude-from=.gitignore \
+            --exclude='.git*' \
+            --exclude='build/' \
+            --exclude='tests/' \
+            --exclude='vendor/' \
+            --exclude='*.lock' \
+            --exclude='phpunit.xml' \
+            --exclude='phpstan.neon' \
+            --exclude='.github/' \
+            . build/release/
+          
+          # Create archive
+          cd build/release
+          zip -r "../../$ARCHIVE_NAME" .
+          cd ../..
+          
+          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
+          echo "✅ Created release archive: $ARCHIVE_NAME"
+
+      - name: Generate checksums
+        run: |
+          sha256sum "$ARCHIVE_NAME" > checksums.txt
+          sha512sum "$ARCHIVE_NAME" >> checksums.txt
+          echo "✅ Generated checksums"
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+        with:
+          name: release-assets
+          path: |
+            ${{ env.ARCHIVE_NAME }}
+            checksums.txt
+          retention-days: 7
+
+  create-tag:
+    name: Create Tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [validate, tests, build]
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push origin "$VERSION"
+          
+          echo "✅ Created and pushed tag: $VERSION"
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [validate, tests, build, create-tag]
+    if: always() && needs.validate.result == 'success' && needs.tests.result == 'success' && needs.build.result == 'success' && (needs.create-tag.result == 'success' || needs.create-tag.result == 'skipped')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          fetch-depth: 0
+
+      - name: Download release assets
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: release-assets
+
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          
+          # Get the previous tag
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -v "$VERSION" | head -n1)
+          
+          # Generate changelog
+          if [[ -n "$PREVIOUS_TAG" ]]; then
+            echo "## Changes since $PREVIOUS_TAG" > release-notes.md
+            echo "" >> release-notes.md
+            
+            # Get commits since last tag
+            git log --pretty=format:"- %s (%h)" "$PREVIOUS_TAG"..HEAD >> release-notes.md
+          else
+            echo "## Initial Release" > release-notes.md
+            echo "" >> release-notes.md
+            echo "This is the initial release of Laravel Prometheus." >> release-notes.md
+          fi
+          
+          echo "" >> release-notes.md
+          echo "## Installation" >> release-notes.md
+          echo "" >> release-notes.md
+          echo '```bash' >> release-notes.md
+          echo "composer require iamfarhad/laravel-prometheus:$VERSION" >> release-notes.md
+          echo '```' >> release-notes.md
+          
+          echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+          cat release-notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.0.8
+        with:
+          tag_name: ${{ needs.validate.outputs.version }}
+          name: Release ${{ needs.validate.outputs.version }}
+          body: ${{ steps.release-notes.outputs.release_notes }}
+          prerelease: ${{ needs.validate.outputs.is_prerelease }}
+          files: |
+            laravel-prometheus-${{ needs.validate.outputs.version }}.zip
+            checksums.txt
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate attestation for release assets
+        uses: actions/attest-build-provenance@1c608d11d69870c2092266b3f9a6f3abbf17002c # v1.4.3
+        with:
+          subject-path: |
+            laravel-prometheus-${{ needs.validate.outputs.version }}.zip
+            checksums.txt
+
+  package-registry:
+    name: Publish to Package Registry
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [validate, release]
+    if: needs.validate.outputs.is_prerelease == 'false'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@c541c155eee45413f5b09a52248675b1a2575231 # v2.31.1
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv
+          coverage: none
+          tools: composer:v2
+
+      - name: Validate package
+        run: |
+          composer validate --strict --no-check-all
+          echo "✅ Package validation passed"
+
+      - name: Submit to Packagist
+        if: contains(github.repository, 'iamfarhad/laravel-prometheus')
+        run: |
+          # This would typically use Packagist webhook or API
+          # For now, just log that the release is ready for Packagist
+          echo "✅ Release ${{ needs.validate.outputs.version }} is ready for Packagist submission"
+          echo "Packagist will automatically detect the new tag and update the package"
+
+  notification:
+    name: Post-Release Notification
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [validate, release, package-registry]
+    if: always()
+
+    steps:
+      - name: Determine status
+        id: status
+        run: |
+          if [[ "${{ needs.release.result }}" == "success" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=✅ Release ${{ needs.validate.outputs.version }} published successfully" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "message=❌ Release ${{ needs.validate.outputs.version }} failed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Report status
+        run: |
+          echo "${{ steps.status.outputs.message }}"
+          echo "Release validation: ${{ needs.validate.result }}"
+          echo "GitHub release: ${{ needs.release.result }}"
+          echo "Package registry: ${{ needs.package-registry.result }}"

@@ -1,0 +1,37 @@
+# GitLeaks ignore file
+# This file contains patterns for false positives in secret detection
+
+# Common false positives in Laravel/PHP projects
+secret:generic-api-key:config/prometheus.php:*
+secret:generic-api-key:tests/*:*
+secret:generic-api-key:examples/*:*
+
+# Documentation and examples
+secret:*:README.md:*
+secret:*:*.md:*
+secret:*:docs/*:*
+
+# Test fixtures and mock data
+secret:*:tests/fixtures/*:*
+secret:*:tests/TestCase.php:*
+
+# Configuration templates
+secret:*:config/*.php:*
+
+# Common Laravel placeholders
+secret:generic-api-key:*:*your-secret-key*
+secret:generic-api-key:*:*your_secret_key*
+secret:generic-api-key:*:*APP_KEY*
+secret:generic-api-key:*:*REDIS_PASSWORD*
+
+# Composer and package files
+secret:*:composer.json:*
+secret:*:composer.lock:*
+
+# GitHub workflows (may contain example tokens)
+secret:*:.github/workflows/*:*token*
+secret:*:.github/*:*GITHUB_TOKEN*
+
+# Version control
+secret:*:.gitignore:*
+secret:*:.gitattributes:*

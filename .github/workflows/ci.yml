@@ -3,40 +3,104 @@ name: CI
 on:
   push:
     branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
   pull_request:
     branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+  schedule:
+    # Run tests every day at 2 AM UTC to catch dependency issues
+    - cron: '0 2 * * *'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+env:
+  COMPOSER_NORMALIZE_VERSION: "2.42"
 
 jobs:
-  code-style:
+  changes:
+    name: Detect Changes
     runs-on: ubuntu-latest
-    name: Code Style (Pint)
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
+      tests: ${{ steps.changes.outputs.tests }}
+      composer: ${{ steps.changes.outputs.composer }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          fetch-depth: 0
+
+      - name: Check for changes
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: changes
+        with:
+          filters: |
+            code:
+              - 'src/**'
+              - 'config/**'
+            tests:
+              - 'tests/**'
+              - 'phpunit.xml'
+            composer:
+              - 'composer.json'
+              - 'composer.lock'
+
+  code-style:
+    name: Code Style
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: changes
+    if: needs.changes.outputs.code == 'true' || needs.changes.outputs.tests == 'true'
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@c541c155eee45413f5b09a52248675b1a2575231 # v2.31.1
         with:
           php-version: '8.4'
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv
           coverage: none
+          tools: composer:v2
 
-      - name: Cache Composer packages
+      - name: Validate composer.json
+        run: composer validate --strict
+
+      - name: Get Composer Cache Directory
         id: composer-cache
-        uses: actions/cache@v3
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
         with:
-          path: vendor
-          key: ${{ runner.os }}-php-pint-${{ hashFiles('**/composer.lock') }}
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
           restore-keys: |
-            ${{ runner.os }}-php-pint-
+            ${{ runner.os }}-composer-
 
       - name: Install dependencies
-        run: composer install --prefer-dist --no-progress
+        run: composer install --prefer-dist --no-progress --no-interaction --optimize-autoloader
 
-      - name: Run Laravel Pint (dry-run)
+      - name: Check code style (dry run)
         id: pint-check
         run: |
           if ./vendor/bin/pint --test; then
@@ -45,7 +109,7 @@ jobs:
             echo "style_ok=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Run Laravel Pint (fix)
+      - name: Fix code style
         if: steps.pint-check.outputs.style_ok == 'false' && github.event_name == 'push'
         run: ./vendor/bin/pint
 
@@ -60,152 +124,288 @@ jobs:
             git push
           fi
 
-      - name: Fail PR if style issues
+      - name: Fail PR if style issues found
         if: steps.pint-check.outputs.style_ok == 'false' && github.event_name == 'pull_request'
         run: |
-          echo "❌ Code style issues found. Please run 'composer format' or './vendor/bin/pint' to fix them."
+          echo "❌ Code style issues found. Please run 'composer format' or './vendor/bin/pint' locally."
           exit 1
 
-  static-analysis:
+  security:
+    name: Security Analysis
     runs-on: ubuntu-latest
-    name: Static Analysis (PHPStan)
+    timeout-minutes: 15
+    needs: changes
+    if: needs.changes.outputs.code == 'true' || needs.changes.outputs.composer == 'true'
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@c541c155eee45413f5b09a52248675b1a2575231 # v2.31.1
         with:
           php-version: '8.4'
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv
           coverage: none
+          tools: composer:v2
 
-      - name: Cache Composer packages
+      - name: Get Composer Cache Directory
         id: composer-cache
-        uses: actions/cache@v3
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
         with:
-          path: vendor
-          key: ${{ runner.os }}-php-phpstan-${{ hashFiles('**/composer.lock') }}
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-security-${{ hashFiles('**/composer.lock') }}
           restore-keys: |
-            ${{ runner.os }}-php-phpstan-
+            ${{ runner.os }}-composer-security-
+            ${{ runner.os }}-composer-
 
       - name: Install dependencies
-        run: composer install --prefer-dist --no-progress
+        run: composer install --prefer-dist --no-progress --no-interaction --optimize-autoloader
+
+      - name: Run Composer Security Audit
+        run: composer audit --format=json --no-dev || true
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@4dd16135b69a43b6c8efb853346f8437d92d3c93 # v3.26.6
+        with:
+          languages: php
+          queries: security-and-quality
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@4dd16135b69a43b6c8efb853346f8437d92d3c93 # v3.26.6
+        with:
+          category: "/language:php"
+
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: changes
+    if: needs.changes.outputs.code == 'true' || needs.changes.outputs.tests == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@c541c155eee45413f5b09a52248675b1a2575231 # v2.31.1
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv
+          coverage: none
+          tools: composer:v2
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-phpstan-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-phpstan-
+            ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction --optimize-autoloader
+
+      - name: Cache PHPStan results
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+        with:
+          path: .phpstan.cache
+          key: ${{ runner.os }}-phpstan-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-phpstan-
 
       - name: Run PHPStan
-        run: ./vendor/bin/phpstan analyse --memory-limit=1G
+        run: ./vendor/bin/phpstan analyse --memory-limit=1G --error-format=github
 
-  test:
+  tests:
+    name: Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: changes
+    if: needs.changes.outputs.code == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.composer == 'true'
+
     strategy:
       fail-fast: false
       matrix:
-        php: [8.2, 8.3, 8.4]
-        laravel: [10.*, 11.*, 12.*]
+        php: ['8.2', '8.3', '8.4']
+        laravel: ['10.*', '11.*', '12.*']
         stability: [prefer-stable]
         exclude:
-          - laravel: 12.*
-            php: 8.2
+          - laravel: '12.*'
+            php: '8.2'
         include:
-          - laravel: 10.*
-            testbench: 8.*
-          - laravel: 11.*
-            testbench: 9.*
-          - laravel: 12.*
-            testbench: 10.*
+          - laravel: '10.*'
+            testbench: '8.*'
+          - laravel: '11.*'
+            testbench: '9.*'
+          - laravel: '12.*'
+            testbench: '10.*'
 
     name: Tests P${{ matrix.php }} - L${{ matrix.laravel }}
 
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@c541c155eee45413f5b09a52248675b1a2575231 # v2.31.1
         with:
           php-version: ${{ matrix.php }}
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, redis, apcu
-          coverage: none
-          ini-values: memory_limit=1024M, zend.max_allowed_stack_size=16777216, max_execution_time=300
+          coverage: pcov
+          tools: composer:v2
+          ini-values: memory_limit=1024M, max_execution_time=300
 
-      - name: Setup Redis
-        uses: supercharge/redis-github-action@1.7.0
-        with:
-          redis-version: 7
-
-      - name: Cache Composer packages
+      - name: Get Composer Cache Directory
         id: composer-cache
-        uses: actions/cache@v3
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
         with:
-          path: vendor
-          key: ${{ runner.os }}-php-${{ matrix.php }}-laravel-${{ matrix.laravel }}-${{ hashFiles('**/composer.lock') }}
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ matrix.laravel }}-${{ hashFiles('**/composer.lock') }}
           restore-keys: |
-            ${{ runner.os }}-php-${{ matrix.php }}-laravel-${{ matrix.laravel }}-
+            ${{ runner.os }}-composer-${{ matrix.php }}-${{ matrix.laravel }}-
+            ${{ runner.os }}-composer-${{ matrix.php }}-
+            ${{ runner.os }}-composer-
 
       - name: Install dependencies
         run: |
           composer require "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
-          composer update --${{ matrix.stability }} --prefer-dist --no-interaction
+          composer update --${{ matrix.stability }} --prefer-dist --no-interaction --optimize-autoloader
 
-      - name: Create directories
-        run: mkdir -p build/logs
-
-      - name: Run Core Tests (Storage, Metrics, Prometheus)
+      - name: Create required directories
         run: |
-          echo "🧪 Running core functionality tests..."
-          ./vendor/bin/phpunit tests/Unit/Storage/ tests/Unit/Metrics/ tests/Unit/PrometheusTest.php tests/Unit/MetricRegistryTest.php tests/Feature/ --verbose
+          mkdir -p build/logs
+          mkdir -p storage/logs
 
-      - name: Run All Tests (with fallback)
-        run: |
-          echo "🧪 Attempting to run full test suite..."
-          if ! timeout 300 ./vendor/bin/phpunit --verbose; then
-            echo "⚠️ Full test suite timed out or failed, but core tests passed ✅"
-            echo "This is expected due to known compatibility issues with Laravel 12 + Orchestra Testbench"
-          fi
+      - name: Run PHPUnit Tests
+        run: ./vendor/bin/phpunit --verbose --coverage-clover=coverage.xml
+        env:
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
 
-  coverage:
-    runs-on: ubuntu-latest
-    name: Coverage Report
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - name: Upload coverage to Codecov
+        if: matrix.php == '8.4' && matrix.laravel == '11.*'
+        uses: codecov/codecov-action@e28ff129e5465c2c0dcc6f003fc735cb6ae0c673 # v4.5.0
         with:
-          php-version: '8.4'
-          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, redis, apcu, xdebug
-          coverage: xdebug
-          ini-values: memory_limit=1024M, zend.max_allowed_stack_size=16777216
-
-      - name: Setup Redis
-        uses: supercharge/redis-github-action@1.7.0
-        with:
-          redis-version: 7
-
-      - name: Cache Composer packages
-        id: composer-cache
-        uses: actions/cache@v3
-        with:
-          path: vendor
-          key: ${{ runner.os }}-php-coverage-${{ hashFiles('**/composer.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-php-coverage-
-
-      - name: Install dependencies
-        run: composer install --prefer-dist --no-progress
-
-      - name: Run tests with coverage (core tests only)
-        run: |
-          ./vendor/bin/phpunit tests/Unit/Storage/ tests/Unit/Metrics/ tests/Unit/PrometheusTest.php tests/Unit/MetricRegistryTest.php tests/Feature/ --coverage-clover=coverage.xml
-
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v3
-        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           file: ./coverage.xml
           flags: unittests
-          name: laravel-prometheus
+          name: laravel-prometheus-php${{ matrix.php }}-laravel${{ matrix.laravel }}
           fail_ci_if_error: false
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@5a2ce3f5b92ee19cbb1541a4984c76d921601d7c # v4.3.4
+        with:
+          fail-on-severity: moderate
+          deny-licenses: GPL-2.0, GPL-3.0
+
+  build-validation:
+    name: Build Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [code-style, static-analysis, tests]
+    if: always() && (needs.code-style.result == 'success' || needs.code-style.result == 'skipped') && (needs.static-analysis.result == 'success' || needs.static-analysis.result == 'skipped') && (needs.tests.result == 'success' || needs.tests.result == 'skipped')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@c541c155eee45413f5b09a52248675b1a2575231 # v2.31.1
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv
+          coverage: none
+          tools: composer:v2
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-build-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-build-
+            ${{ runner.os }}-composer-
+
+      - name: Install dependencies (production)
+        run: composer install --prefer-dist --no-progress --no-interaction --optimize-autoloader --no-dev
+
+      - name: Check autoloader optimization
+        run: composer dump-autoload --optimize --classmap-authoritative
+
+      - name: Validate package structure
+        run: |
+          echo "✅ Checking package structure..."
+          test -f "composer.json" || (echo "❌ composer.json missing" && exit 1)
+          test -d "src" || (echo "❌ src directory missing" && exit 1)
+          test -f "src/PrometheusServiceProvider.php" || (echo "❌ Service provider missing" && exit 1)
+          test -d "config" || (echo "❌ config directory missing" && exit 1)
+          test -f "config/prometheus.php" || (echo "❌ Config file missing" && exit 1)
+          echo "✅ Package structure validation passed"
+
+  notification:
+    name: Notification
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [code-style, security, static-analysis, tests, build-validation]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Determine overall status
+        id: status
+        run: |
+          if [[ "${{ needs.code-style.result }}" == "failure" || "${{ needs.security.result }}" == "failure" || "${{ needs.static-analysis.result }}" == "failure" || "${{ needs.tests.result }}" == "failure" || "${{ needs.build-validation.result }}" == "failure" ]]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "message=❌ CI pipeline failed" >> $GITHUB_OUTPUT
+          else
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=✅ CI pipeline passed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Report status
+        run: |
+          echo "${{ steps.status.outputs.message }}"
+          echo "Code Style: ${{ needs.code-style.result }}"
+          echo "Security: ${{ needs.security.result }}"
+          echo "Static Analysis: ${{ needs.static-analysis.result }}"
+          echo "Tests: ${{ needs.tests.result }}"
+          echo "Build Validation: ${{ needs.build-validation.result }}"
