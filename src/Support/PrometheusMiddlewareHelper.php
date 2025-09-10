@@ -11,10 +11,10 @@ class PrometheusMiddlewareHelper
 {
     /**
      * Add Prometheus metrics middleware to the application.
-     * 
+     *
      * This is a convenience method for easily adding the middleware
      * to Laravel 11+ applications in bootstrap/app.php.
-     * 
+     *
      * Note: Configuration checks are done at runtime in the middleware itself.
      */
     public static function register(Middleware $middleware): void
@@ -26,8 +26,8 @@ class PrometheusMiddlewareHelper
 
     /**
      * Add Prometheus metrics middleware to specific middleware groups.
-     * 
-     * @param array $groups The middleware groups to add to (e.g., ['web', 'api'])
+     *
+     * @param  array  $groups  The middleware groups to add to (e.g., ['web', 'api'])
      */
     public static function registerToGroups(Middleware $middleware, array $groups = ['web', 'api']): void
     {

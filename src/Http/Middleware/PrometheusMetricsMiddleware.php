@@ -24,6 +24,7 @@ class PrometheusMetricsMiddleware
 
         if (! $this->collector || ! $this->isEnabled()) {
             $this->debugInfo('Collector disabled or null - skipping metrics');
+
             return $next($request);
         }
 

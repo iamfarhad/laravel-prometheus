@@ -95,7 +95,7 @@ final class HttpRequestCollector implements CollectorInterface
         $this->debugCollectorActivity('HttpRequestCollector', 'recording request', [
             'method' => $method,
             'route' => $route,
-            'status' => $status
+            'status' => $status,
         ]);
 
         // Record request count

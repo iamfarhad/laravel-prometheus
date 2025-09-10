@@ -14,7 +14,7 @@ trait HasDebugLogging
     protected function debugLog(string $message, array $context = []): void
     {
         if ($this->isDebugEnabled()) {
-            Log::debug('[Prometheus] ' . $message, $context);
+            Log::debug('[Prometheus] '.$message, $context);
         }
     }
 
@@ -24,7 +24,7 @@ trait HasDebugLogging
     protected function debugInfo(string $message, array $context = []): void
     {
         if ($this->isDebugEnabled()) {
-            Log::info('[Prometheus] ' . $message, $context);
+            Log::info('[Prometheus] '.$message, $context);
         }
     }
 
@@ -34,7 +34,7 @@ trait HasDebugLogging
     protected function debugWarning(string $message, array $context = []): void
     {
         if ($this->isDebugEnabled()) {
-            Log::warning('[Prometheus] ' . $message, $context);
+            Log::warning('[Prometheus] '.$message, $context);
         }
     }
 

@@ -83,7 +83,7 @@ final class CacheOperationCollector implements CollectorInterface
     public function handleCacheHit(CacheHit $event): void
     {
         // Only track application cache operations, not internal storage operations
-        if (!$this->shouldTrackCacheOperation($event)) {
+        if (! $this->shouldTrackCacheOperation($event)) {
             return;
         }
 
@@ -95,14 +95,14 @@ final class CacheOperationCollector implements CollectorInterface
     public function handleCacheMiss(CacheMissed $event): void
     {
         // Only track application cache operations, not internal storage operations
-        if (!$this->shouldTrackCacheOperation($event)) {
+        if (! $this->shouldTrackCacheOperation($event)) {
             return;
         }
 
         $this->debugCollectorActivity('CacheOperationCollector', 'cache miss tracked', [
             'key' => $event->key ?? '',
             'store' => $event->storeName ?? 'default',
-            'tags' => $event->tags ?? []
+            'tags' => $event->tags ?? [],
         ]);
 
         $startTime = microtime(true);
@@ -113,7 +113,7 @@ final class CacheOperationCollector implements CollectorInterface
     public function handleKeyWritten(KeyWritten $event): void
     {
         // Only track application cache operations, not internal storage operations
-        if (!$this->shouldTrackCacheOperation($event)) {
+        if (! $this->shouldTrackCacheOperation($event)) {
             return;
         }
 
@@ -125,7 +125,7 @@ final class CacheOperationCollector implements CollectorInterface
     public function handleKeyForgotten(KeyForgotten $event): void
     {
         // Only track application cache operations, not internal storage operations
-        if (!$this->shouldTrackCacheOperation($event)) {
+        if (! $this->shouldTrackCacheOperation($event)) {
             return;
         }
 

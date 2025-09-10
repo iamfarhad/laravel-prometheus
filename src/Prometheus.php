@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Iamfarhad\Prometheus;
 
-use InvalidArgumentException;
 use Iamfarhad\Prometheus\Traits\HasDebugLogging;
+use InvalidArgumentException;
 use Prometheus\CollectorRegistry;
 use Prometheus\Counter;
 use Prometheus\Gauge;
@@ -28,7 +28,7 @@ final class Prometheus
     ) {
         $this->debugInfo('Prometheus instance created', [
             'namespace' => $namespace,
-            'registry_class' => get_class($registry)
+            'registry_class' => get_class($registry),
         ]);
     }
 
@@ -181,7 +181,7 @@ final class Prometheus
 
         $this->debugMetricOperation('getOrRegisterSummary', $fullName, $labelNames, [
             'max_age_seconds' => $maxAgeSeconds,
-            'quantiles' => $quantiles
+            'quantiles' => $quantiles,
         ]);
 
         return $this->registry->getOrRegisterSummary($this->namespace, $fullName, $help, $labelNames, $maxAgeSeconds, $quantiles);
@@ -201,7 +201,7 @@ final class Prometheus
         $samples = $this->registry->getMetricFamilySamples();
 
         foreach ($samples as $sample) {
-            if ($sample->getName() === $fullName || $sample->getName() === $this->namespace . '_' . $fullName) {
+            if ($sample->getName() === $fullName || $sample->getName() === $this->namespace.'_'.$fullName) {
                 return true;
             }
         }
@@ -217,7 +217,7 @@ final class Prometheus
         $samples = $this->registry->getMetricFamilySamples();
 
         $this->debugTiming('metrics collection', $startTime, [
-            'samples_count' => count($samples)
+            'samples_count' => count($samples),
         ]);
 
         return $samples;
@@ -232,7 +232,7 @@ final class Prometheus
         $result = $renderer->render($this->collect());
 
         $this->debugTiming('metrics rendering', $startTime, [
-            'output_size' => strlen($result)
+            'output_size' => strlen($result),
         ]);
 
         return $result;

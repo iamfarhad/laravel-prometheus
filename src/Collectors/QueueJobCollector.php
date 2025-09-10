@@ -175,7 +175,7 @@ final class QueueJobCollector implements CollectorInterface
         }
 
         // Fallback to a hash of the job object
-        return md5(spl_object_hash($job) . microtime());
+        return md5(spl_object_hash($job).microtime());
     }
 
     public function isEnabled(): bool

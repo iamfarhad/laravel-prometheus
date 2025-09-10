@@ -25,14 +25,14 @@ class PrometheusServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->publishes([
-            __DIR__ . '/../config/prometheus.php' => config_path('prometheus.php'),
+            __DIR__.'/../config/prometheus.php' => config_path('prometheus.php'),
         ], 'prometheus-config');
 
-        $this->mergeConfigFrom(__DIR__ . '/../config/prometheus.php', 'prometheus');
+        $this->mergeConfigFrom(__DIR__.'/../config/prometheus.php', 'prometheus');
 
         // Register routes if enabled
         if ($this->app['config']->get('prometheus.metrics_route.enabled', false)) {
-            $this->loadRoutesFrom(__DIR__ . '/routes.php');
+            $this->loadRoutesFrom(__DIR__.'/routes.php');
         }
 
         // Register HTTP middleware if auto-registration is enabled
@@ -231,7 +231,7 @@ class PrometheusServiceProvider extends ServiceProvider
                 // Silently fail if automatic registration doesn't work
                 // Users can still register manually
                 if (config('prometheus.debug', false)) {
-                    \Log::warning('[Prometheus] Automatic middleware registration failed: ' . $e->getMessage());
+                    \Log::warning('[Prometheus] Automatic middleware registration failed: '.$e->getMessage());
                 }
             }
         });
