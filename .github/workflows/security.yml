@@ -78,7 +78,7 @@ jobs:
 
       - name: Upload audit results
         if: steps.audit.outputs.audit_status == 'vulnerabilities_found'
-        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: composer-audit-results
           path: audit-results.json
@@ -291,7 +291,7 @@ jobs:
           echo "✅ All licenses are compliant"
 
       - name: Upload license report
-        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: license-report
           path: licenses.json
