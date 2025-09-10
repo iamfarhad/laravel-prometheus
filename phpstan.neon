@@ -1,0 +1,34 @@
+parameters:
+    level: 8
+    paths:
+        - src
+        - tests
+    
+    # Ignore common Laravel/testing patterns and Redis connection issues
+    ignoreErrors:
+        - '#Access to an undefined property [a-zA-Z0-9\\_]+::\$[a-zA-Z0-9_]+#'
+        - '#Call to an undefined method Illuminate\\Redis\\Connections\\Connection::[a-zA-Z]+\(\)#'
+        - '#Cannot access offset .+ on Illuminate\\Contracts\\Foundation\\Application#'
+        - '#Cannot call method .+ on Illuminate\\Foundation\\Application\|null#'
+        - '#Offset .+ does not exist on Illuminate\\Foundation\\Application\|null#'
+        - '#Parameter .+ expects .+, Illuminate\\Foundation\\Application\|null given#'
+        - '#Dead catch - Throwable is never thrown in the try block#'
+        - '#Unreachable statement - code above always terminates#'
+        - '#Cannot call method .+ on class-string\|object#'
+        - '#Instantiated class .+APCUIterator not found#'
+        - '#Iterating over an object of an unknown class .+APCUIterator#'
+        - '#Method .+::findBucket\(\) is unused#'
+        - '#Possibly invalid array key type#'
+        - '#Negated boolean expression is always true#'
+        - '#Cannot call method name\(\) on array\|Illuminate\\Routing\\Route#'
+        -
+            identifier: missingType.iterableValue
+        
+    # Bootstrap for Laravel
+    bootstrapFiles:
+        - vendor/autoload.php
+    
+    # Exclude vendor and build directories
+    excludePaths:
+        - vendor/*
+        - build/*
