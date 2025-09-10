@@ -1,10 +1,12 @@
 name: Coding Standards
 
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+    push:
+      branches:
+        - '*'
+    pull_request:
+      branches:
+        - '*'
 
 env:
   COMPOSER_PROCESS_TIMEOUT: 0
