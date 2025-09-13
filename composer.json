@@ -1,6 +1,5 @@
 {
     "name": "iamfarhad/laravel-prometheus",
-    "version": "1.0.0",
     "description": "Production-ready Laravel Prometheus metrics package with built-in collectors for HTTP, database, cache, queue, events, errors, filesystem, and mail monitoring",
     "type": "library",
     "license": "MIT",
