@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace Iamfarhad\Prometheus\Tests\Feature;
 
+use Iamfarhad\Prometheus\Collectors\CacheOperationCollector;
+use Iamfarhad\Prometheus\Collectors\DatabaseQueryCollector;
+use Iamfarhad\Prometheus\Collectors\HttpRequestCollector;
+use Iamfarhad\Prometheus\Collectors\QueueJobCollector;
 use Iamfarhad\Prometheus\Prometheus;
+use Iamfarhad\Prometheus\PrometheusServiceProvider;
 use Iamfarhad\Prometheus\Tests\TestCase;
 use Prometheus\CollectorRegistry;
 
@@ -66,7 +71,7 @@ final class PrometheusServiceProviderTest extends TestCase
         // Note: PromPHP doesn't have a clear method like our old implementation
 
         // Re-register the service provider to apply config changes
-        $provider = new \Iamfarhad\Prometheus\PrometheusServiceProvider($this->app);
+        $provider = new PrometheusServiceProvider($this->app);
         $provider->boot();
 
         $routes = $this->app['router']->getRoutes();
@@ -87,17 +92,17 @@ final class PrometheusServiceProviderTest extends TestCase
         $this->assertTrue($this->app['config']->get('prometheus.collectors.queue.enabled'));
 
         // Verify they can be resolved (which implicitly tests binding)
-        $httpCollector = $this->app->make(\Iamfarhad\Prometheus\Collectors\HttpRequestCollector::class);
-        $this->assertInstanceOf(\Iamfarhad\Prometheus\Collectors\HttpRequestCollector::class, $httpCollector);
+        $httpCollector = $this->app->make(HttpRequestCollector::class);
+        $this->assertInstanceOf(HttpRequestCollector::class, $httpCollector);
 
-        $databaseCollector = $this->app->make(\Iamfarhad\Prometheus\Collectors\DatabaseQueryCollector::class);
-        $this->assertInstanceOf(\Iamfarhad\Prometheus\Collectors\DatabaseQueryCollector::class, $databaseCollector);
+        $databaseCollector = $this->app->make(DatabaseQueryCollector::class);
+        $this->assertInstanceOf(DatabaseQueryCollector::class, $databaseCollector);
 
-        $cacheCollector = $this->app->make(\Iamfarhad\Prometheus\Collectors\CacheOperationCollector::class);
-        $this->assertInstanceOf(\Iamfarhad\Prometheus\Collectors\CacheOperationCollector::class, $cacheCollector);
+        $cacheCollector = $this->app->make(CacheOperationCollector::class);
+        $this->assertInstanceOf(CacheOperationCollector::class, $cacheCollector);
 
-        $queueCollector = $this->app->make(\Iamfarhad\Prometheus\Collectors\QueueJobCollector::class);
-        $this->assertInstanceOf(\Iamfarhad\Prometheus\Collectors\QueueJobCollector::class, $queueCollector);
+        $queueCollector = $this->app->make(QueueJobCollector::class);
+        $this->assertInstanceOf(QueueJobCollector::class, $queueCollector);
     }
 
     public function test_collectors_are_not_registered_when_prometheus_disabled(): void
@@ -106,14 +111,14 @@ final class PrometheusServiceProviderTest extends TestCase
         $app = $this->createApplication();
         $app['config']->set('prometheus.enabled', false);
 
-        $provider = new \Iamfarhad\Prometheus\PrometheusServiceProvider($app);
+        $provider = new PrometheusServiceProvider($app);
         $provider->register();
 
         // Collectors should not be registered when prometheus is disabled
-        $this->assertFalse($app->bound(\Iamfarhad\Prometheus\Collectors\HttpRequestCollector::class));
-        $this->assertFalse($app->bound(\Iamfarhad\Prometheus\Collectors\DatabaseQueryCollector::class));
-        $this->assertFalse($app->bound(\Iamfarhad\Prometheus\Collectors\CacheOperationCollector::class));
-        $this->assertFalse($app->bound(\Iamfarhad\Prometheus\Collectors\QueueJobCollector::class));
+        $this->assertFalse($app->bound(HttpRequestCollector::class));
+        $this->assertFalse($app->bound(DatabaseQueryCollector::class));
+        $this->assertFalse($app->bound(CacheOperationCollector::class));
+        $this->assertFalse($app->bound(QueueJobCollector::class));
     }
 
     public function test_individual_collectors_can_be_disabled(): void
@@ -122,15 +127,15 @@ final class PrometheusServiceProviderTest extends TestCase
         $this->app['config']->set('prometheus.collectors.http.enabled', false);
 
         // Re-register service provider
-        $provider = new \Iamfarhad\Prometheus\PrometheusServiceProvider($this->app);
+        $provider = new PrometheusServiceProvider($this->app);
         $provider->register();
 
         // HTTP collector should not be bound, others should be
-        $this->assertFalse($this->app->bound(\Iamfarhad\Prometheus\Collectors\HttpRequestCollector::class));
+        $this->assertFalse($this->app->bound(HttpRequestCollector::class));
 
         // Other collectors should still be bound
-        $this->assertTrue($this->app->bound(\Iamfarhad\Prometheus\Collectors\DatabaseQueryCollector::class));
-        $this->assertTrue($this->app->bound(\Iamfarhad\Prometheus\Collectors\CacheOperationCollector::class));
-        $this->assertTrue($this->app->bound(\Iamfarhad\Prometheus\Collectors\QueueJobCollector::class));
+        $this->assertTrue($this->app->bound(DatabaseQueryCollector::class));
+        $this->assertTrue($this->app->bound(CacheOperationCollector::class));
+        $this->assertTrue($this->app->bound(QueueJobCollector::class));
     }
 }

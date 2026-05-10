@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Iamfarhad\Prometheus\Tests\Feature;
 
+use Iamfarhad\Prometheus\Collectors\HttpRequestCollector;
 use Iamfarhad\Prometheus\Http\Middleware\PrometheusMetricsMiddleware;
 use Iamfarhad\Prometheus\Prometheus;
 use Iamfarhad\Prometheus\Tests\TestCase;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Route;
 
 final class HttpMetricsTest extends TestCase
@@ -47,11 +50,11 @@ final class HttpMetricsTest extends TestCase
     public function test_http_metrics_are_collected(): void
     {
         // Manually trigger HTTP metrics collection
-        $collector = $this->app->make(\Iamfarhad\Prometheus\Collectors\HttpRequestCollector::class);
+        $collector = $this->app->make(HttpRequestCollector::class);
         $prometheus = $this->app->make(Prometheus::class);
 
         // Simulate a request being recorded
-        $request = \Illuminate\Http\Request::create('/test', 'GET');
+        $request = Request::create('/test', 'GET');
         $request->setRouteResolver(function () {
             $route = new \Illuminate\Routing\Route(['GET'], '/test', function () {});
             $route->name('test.route');
@@ -59,7 +62,7 @@ final class HttpMetricsTest extends TestCase
             return $route;
         });
 
-        $response = new \Illuminate\Http\Response('OK', 200);
+        $response = new Response('OK', 200);
         $startTime = microtime(true) - 0.1; // Simulate 100ms request
 
         $collector->recordRequest($request, $response, $startTime);
@@ -74,11 +77,11 @@ final class HttpMetricsTest extends TestCase
 
     public function test_http_metrics_track_different_status_codes(): void
     {
-        $collector = $this->app->make(\Iamfarhad\Prometheus\Collectors\HttpRequestCollector::class);
+        $collector = $this->app->make(HttpRequestCollector::class);
         $prometheus = $this->app->make(Prometheus::class);
 
         // Simulate requests with different status codes
-        $request200 = \Illuminate\Http\Request::create('/test', 'GET');
+        $request200 = Request::create('/test', 'GET');
         $request200->setRouteResolver(function () {
             $route = new \Illuminate\Routing\Route(['GET'], '/test', function () {});
             $route->name('test.route');
@@ -86,7 +89,7 @@ final class HttpMetricsTest extends TestCase
             return $route;
         });
 
-        $request500 = \Illuminate\Http\Request::create('/test-error', 'GET');
+        $request500 = Request::create('/test-error', 'GET');
         $request500->setRouteResolver(function () {
             $route = new \Illuminate\Routing\Route(['GET'], '/test-error', function () {});
             $route->name('test.error');
@@ -94,8 +97,8 @@ final class HttpMetricsTest extends TestCase
             return $route;
         });
 
-        $response200 = new \Illuminate\Http\Response('OK', 200);
-        $response500 = new \Illuminate\Http\Response('Error', 500);
+        $response200 = new Response('OK', 200);
+        $response500 = new Response('Error', 500);
         $startTime = microtime(true) - 0.1;
 
         $collector->recordRequest($request200, $response200, $startTime);
@@ -110,21 +113,21 @@ final class HttpMetricsTest extends TestCase
 
     public function test_http_collector_can_be_instantiated(): void
     {
-        $collector = $this->app->make(\Iamfarhad\Prometheus\Collectors\HttpRequestCollector::class);
+        $collector = $this->app->make(HttpRequestCollector::class);
         $prometheus = $this->app->make(Prometheus::class);
 
         $this->assertTrue($collector->isEnabled());
-        $this->assertInstanceOf(\Iamfarhad\Prometheus\Collectors\HttpRequestCollector::class, $collector);
+        $this->assertInstanceOf(HttpRequestCollector::class, $collector);
         $this->assertInstanceOf(Prometheus::class, $prometheus);
     }
 
     public function test_http_collector_records_different_methods(): void
     {
-        $collector = $this->app->make(\Iamfarhad\Prometheus\Collectors\HttpRequestCollector::class);
+        $collector = $this->app->make(HttpRequestCollector::class);
         $prometheus = $this->app->make(Prometheus::class);
 
         // Simulate GET request
-        $getRequest = \Illuminate\Http\Request::create('/test', 'GET');
+        $getRequest = Request::create('/test', 'GET');
         $getRequest->setRouteResolver(function () {
             $route = new \Illuminate\Routing\Route(['GET'], '/test', function () {});
             $route->name('test.route');
@@ -133,7 +136,7 @@ final class HttpMetricsTest extends TestCase
         });
 
         // Simulate POST request
-        $postRequest = \Illuminate\Http\Request::create('/test', 'POST');
+        $postRequest = Request::create('/test', 'POST');
         $postRequest->setRouteResolver(function () {
             $route = new \Illuminate\Routing\Route(['POST'], '/test', function () {});
             $route->name('test.route');
@@ -141,7 +144,7 @@ final class HttpMetricsTest extends TestCase
             return $route;
         });
 
-        $response = new \Illuminate\Http\Response('OK', 200);
+        $response = new Response('OK', 200);
         $startTime = microtime(true) - 0.1;
 
         $collector->recordRequest($getRequest, $response, $startTime);
@@ -158,10 +161,10 @@ final class HttpMetricsTest extends TestCase
         // Ensure HTTP collector is enabled
         config(['prometheus.collectors.http.enabled' => true]);
 
-        $collector = $this->app->make(\Iamfarhad\Prometheus\Collectors\HttpRequestCollector::class);
+        $collector = $this->app->make(HttpRequestCollector::class);
         $prometheus = $this->app->make(Prometheus::class);
 
-        $request = \Illuminate\Http\Request::create('/test', 'GET');
+        $request = Request::create('/test', 'GET');
         $request->setRouteResolver(function () {
             $route = new \Illuminate\Routing\Route(['GET'], '/test', function () {});
             $route->name('test.route');
@@ -169,7 +172,7 @@ final class HttpMetricsTest extends TestCase
             return $route;
         });
 
-        $response = new \Illuminate\Http\Response('OK', 200);
+        $response = new Response('OK', 200);
         $startTime = microtime(true) - 0.1;
 
         // Record a request - this should not throw an exception

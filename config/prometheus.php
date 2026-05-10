@@ -189,11 +189,6 @@ return [
             'histogram_buckets' => [0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0],
         ],
 
-        'notification' => [
-            'enabled' => env('PROMETHEUS_COLLECTOR_NOTIFICATION_ENABLED', false),
-            'histogram_buckets' => [0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0],
-        ],
-
         'command' => [
             'enabled' => env('PROMETHEUS_COLLECTOR_COMMAND_ENABLED', true),
             // Artisan command duration - Wide range for different command types
