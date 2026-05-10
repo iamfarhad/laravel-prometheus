@@ -38,9 +38,10 @@ final class BuiltInCollectorHealthTest extends TestCase
         ];
     }
 
-    public function test_all_configured_built_in_collectors_have_implementations(): void
+    public function test_all_package_configured_built_in_collectors_have_implementations(): void
     {
-        $configuredCollectors = array_keys(config('prometheus.collectors'));
+        $packageConfig = require __DIR__.'/../../config/prometheus.php';
+        $configuredCollectors = array_keys($packageConfig['collectors']);
         $implementedCollectors = array_keys($this->builtInCollectors());
 
         sort($configuredCollectors);
