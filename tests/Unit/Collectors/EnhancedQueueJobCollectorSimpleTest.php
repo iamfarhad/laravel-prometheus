@@ -54,16 +54,16 @@ final class EnhancedQueueJobCollectorSimpleTest extends TestCase
     public function test_basic_metrics_can_be_created(): void
     {
         // Test that collector can be instantiated and is properly configured
-        $collector = $this->app->make(\Iamfarhad\Prometheus\Collectors\EnhancedQueueJobCollector::class);
-        $this->assertInstanceOf(\Iamfarhad\Prometheus\Collectors\EnhancedQueueJobCollector::class, $collector);
+        $collector = $this->app->make(EnhancedQueueJobCollector::class);
+        $this->assertInstanceOf(EnhancedQueueJobCollector::class, $collector);
         $this->assertTrue($collector->isEnabled());
     }
 
     public function test_enhanced_metrics_collector_works(): void
     {
         // Test that collector can be instantiated without errors
-        $collector = $this->app->make(\Iamfarhad\Prometheus\Collectors\EnhancedQueueJobCollector::class);
-        $this->assertInstanceOf(\Iamfarhad\Prometheus\Collectors\EnhancedQueueJobCollector::class, $collector);
+        $collector = $this->app->make(EnhancedQueueJobCollector::class);
+        $this->assertInstanceOf(EnhancedQueueJobCollector::class, $collector);
         $this->assertTrue($collector->isEnabled());
     }
 

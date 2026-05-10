@@ -16,6 +16,7 @@ use Iamfarhad\Prometheus\Collectors\HttpRequestCollector;
 use Iamfarhad\Prometheus\Collectors\MailCollector;
 use Iamfarhad\Prometheus\Collectors\QueueJobCollector;
 use Iamfarhad\Prometheus\Console\Commands\UpdateQueueMetricsCommand;
+use Iamfarhad\Prometheus\Http\Middleware\PrometheusMetricsMiddleware;
 use Illuminate\Support\ServiceProvider;
 use Prometheus\CollectorRegistry;
 use Prometheus\Storage\Adapter;
@@ -219,11 +220,11 @@ class PrometheusServiceProvider extends ServiceProvider
                         $groups = $router->getMiddlewareGroups();
 
                         if (isset($groups['web']) && method_exists($router, 'pushMiddlewareToGroup')) {
-                            $router->pushMiddlewareToGroup('web', \Iamfarhad\Prometheus\Http\Middleware\PrometheusMetricsMiddleware::class);
+                            $router->pushMiddlewareToGroup('web', PrometheusMetricsMiddleware::class);
                         }
 
                         if (isset($groups['api']) && method_exists($router, 'pushMiddlewareToGroup')) {
-                            $router->pushMiddlewareToGroup('api', \Iamfarhad\Prometheus\Http\Middleware\PrometheusMetricsMiddleware::class);
+                            $router->pushMiddlewareToGroup('api', PrometheusMetricsMiddleware::class);
                         }
                     }
                 }
